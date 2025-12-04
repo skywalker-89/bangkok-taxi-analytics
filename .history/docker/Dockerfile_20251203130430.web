@@ -1,0 +1,31 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# 1. Install system dependencies (Needed for psycopg2 build sometimes)
+RUN apt-get update && apt-get install -y libpq-dev gcc && rm -rf /var/lib/apt/lists/*
+
+# 2. Install Python dependencies with a long timeout
+# We add --default-timeout=1000 to fix the ReadTimeoutError
+RUN pip install --default-timeout=1000 --no-cache-dir \
+    pandas \
+    numpy \
+    h3 \
+    xgboost \
+    mlflow \
+    flask \
+    python-dotenv \
+    joblib \
+    scikit-learn \
+    psycopg2-binary \
+    requests
+
+# 3. Copy source code
+COPY src/web_app /app
+# Copy shared utilities so imports work
+COPY src/utils /app/src/utils 
+
+# 4. Set Python Path so 'import src.utils' works
+ENV PYTHONPATH=/app
+
+CMD ["python", "app.py"]

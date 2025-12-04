@@ -1,0 +1,108 @@
+version: "3.8"
+
+services:
+  # -----------------------------
+  # 1. Central Database (PostgreSQL)
+  # -----------------------------
+  postgres:
+    image: postgres:15
+    container_name: taxi_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -----------------------------
+  # 2. MLflow Tracking Server (Tuned for Performance)
+  # -----------------------------
+  mlflow:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.mlflow
+    container_name: taxi_mlflow
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5001:5000"
+    environment:
+      MLFLOW_BACKEND_STORE_URI: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      MLFLOW_ARTIFACT_ROOT: /mlflow/artifacts
+      MLFLOW_HOST: 0.0.0.0
+      # ✅ FIX: 4 Workers + 300s Timeout + Allow all IPs
+      # This prevents the "500 error" during large model downloads
+      MLFLOW_GUNICORN_OPTS: "--forwarded-allow-ips=* --workers 4 --timeout 300"
+    volumes:
+      - ./mlflow_artifacts:/mlflow/artifacts
+    command: >
+      mlflow server 
+      --host 0.0.0.0 
+      --port 5000 
+      --backend-store-uri postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      --default-artifact-root /mlflow/artifacts
+
+  # -----------------------------
+  # 3. Prediction API (FastAPI)
+  # -----------------------------
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.app
+    container_name: taxi_api
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - DB_HOST=postgres
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+    depends_on:
+      - mlflow
+
+  # -----------------------------
+  # 4. Web Application (Flask UI)
+  # -----------------------------
+  webapp:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    container_name: taxi_webapp
+    restart: always
+    ports:
+      - "8888:8888"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      # Add timeout config for the client side too
+      - MLFLOW_HTTP_REQUEST_TIMEOUT=1000
+    depends_on:
+      - mlflow
+      - api
+
+  # -----------------------------
+  # 5. Prefect (Orchestrator)
+  # -----------------------------
+  prefect:
+    image: prefecthq/prefect:3-latest
+    container_name: taxi_prefect
+    restart: always
+    environment:
+      - PREFECT_API_URL=http://0.0.0.0:4200/api
+    ports:
+      - "4200:4200"
+    command: prefect server start --host 0.0.0.0
+
+volumes:
+  postgres_data:

@@ -1,0 +1,16 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+RUN pip install pandas numpy h3 xgboost mlflow flask python-dotenv joblib scikit-learn psycopg2-binary
+
+# Copy code
+COPY src/web_app /app
+# Also copy src/utils because we might need db connections
+COPY src/utils /app/src/utils 
+
+# Environment variables
+ENV PYTHONPATH=/app
+
+CMD ["python", "app.py"]

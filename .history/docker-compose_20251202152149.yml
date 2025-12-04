@@ -1,0 +1,67 @@
+version: "3.8"
+
+services:
+  # -----------------------------
+  # 1. Central Database (PostgreSQL)
+  # -----------------------------
+  postgres:
+    image: postgres:15
+    container_name: taxi_postgres
+    restart: always
+    environment:
+      # Pulls strictly from your .env file
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -----------------------------
+  # 2. MLflow Tracking Server
+  # -----------------------------
+  mlflow:
+    # ✅ FIX: Build from our custom Dockerfile
+    build:
+      context: ./docker
+      dockerfile: Dockerfile.mlflow
+    container_name: taxi_mlflow
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5001:5000"
+    environment:
+      MLFLOW_BACKEND_STORE_URI: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      MLFLOW_ARTIFACT_ROOT: /mlflow/artifacts
+      MLFLOW_HOST: 0.0.0.0
+    volumes:
+      - ./mlflow_artifacts:/mlflow/artifacts
+    command: >
+      mlflow server
+      --backend-store-uri postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      --host 0.0.0.0
+      --port 5000
+
+  # -----------------------------
+  # 3. Prefect (Orchestrator)
+  # -----------------------------
+  prefect:
+    image: prefecthq/prefect:3-latest
+    container_name: taxi_prefect
+    restart: always
+    environment:
+      - PREFECT_API_URL=http://0.0.0.0:4200/api
+    ports:
+      - "4200:4200"
+    command: prefect server start --host 0.0.0.0
+
+volumes:
+  postgres_data:

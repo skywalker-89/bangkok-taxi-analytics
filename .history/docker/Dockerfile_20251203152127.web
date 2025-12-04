@@ -1,0 +1,28 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y libpq-dev gcc && rm -rf /var/lib/apt/lists/*
+
+# ✅ FIX: Pin numpy<2 (Required for MLflow 2.12) and protobuf<5 (To stop warnings)
+RUN pip install --default-timeout=1000 --no-cache-dir \
+    pandas \
+    "numpy<2.0" \
+    h3 \
+    xgboost \
+    mlflow==2.12.1 \
+    "protobuf<5.0" \
+    flask \
+    python-dotenv \
+    joblib \
+    scikit-learn \
+    psycopg2-binary \
+    requests \
+    setuptools
+
+COPY src/web_app /app
+COPY src/utils /app/src/utils 
+
+ENV PYTHONPATH=/app
+
+CMD ["python", "app.py"]

@@ -1,0 +1,77 @@
+version: "3.8"
+
+services:
+  # -----------------------------
+  # 1. Central Database (PostgreSQL)
+  # -----------------------------
+  postgres:
+    image: postgres:15
+    container_name: taxi_postgres
+    restart: always
+    environment:
+      # Pulls strictly from your .env file
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -----------------------------
+  # 2. MLflow Tracking Server
+  # -----------------------------
+  mlflow:
+    # ✅ FIX: Tell Docker to use your "docker/Dockerfile.mlflow"
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.mlflow
+    container_name: taxi_mlflow
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5001:5000" # Map Host 5001 -> Container 5000
+    environment:
+      # The server reads these automatically
+      MLFLOW_BACKEND_STORE_URI: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      MLFLOW_ARTIFACT_ROOT: /mlflow/artifacts
+      MLFLOW_HOST: 0.0.0.0
+    volumes:
+      - ./mlflow_artifacts:/mlflow/artifacts
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+
+  # -----------------------------
+  # 3. Prefect (Orchestrator)
+  # -----------------------------
+  prefect:
+    image: prefecthq/prefect:3-latest
+    container_name: taxi_prefect
+    restart: always
+    environment:
+      - PREFECT_API_URL=http://0.0.0.0:4200/api
+    ports:
+      - "4200:4200"
+    command: prefect server start --host 0.0.0.0
+
+  webapp:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    container_name: taxi_webapp
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    depends_on:
+      - mlflow
+
+volumes:
+  postgres_data:

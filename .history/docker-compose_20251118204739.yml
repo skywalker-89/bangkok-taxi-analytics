@@ -1,0 +1,55 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: mlflow_user
+      POSTGRES_PASSWORD: mlflow_pass
+      POSTGRES_DB: mlflow_db
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  mlflow:
+    image: python:3.11-slim
+    depends_on:
+      - postgres
+    volumes:
+      - ./mlflow/artifacts:/mlflow/artifacts
+    working_dir: /mlflow
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=postgresql://mlflow_user:mlflow_pass@postgres:5432/mlflow_db
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=file:/mlflow/artifacts
+    command: >
+      bash -lc "pip install mlflow psycopg2-binary && \
+               mlflow server \
+               --backend-store-uri postgresql://mlflow_user:mlflow_pass@postgres:5432/mlflow_db \
+               --default-artifact-root file:/mlflow/artifacts \
+               --host 0.0.0.0 --port 5000"
+    ports:
+      - "5000:5000"
+
+  prefect:
+    image: prefecthq/prefect:2-latest
+    command: prefect server start
+    ports:
+      - "4200:4200"
+
+  prefect-agent:
+    image: prefecthq/prefect:2-latest
+    depends_on:
+      - prefect
+    environment:
+      - PREFECT_API_URL=http://prefect:4200/api
+    command: prefect agent start
+
+  recommender:
+    build: .
+    depends_on:
+      - mlflow
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5001
+    ports:
+      - "8000:8000"

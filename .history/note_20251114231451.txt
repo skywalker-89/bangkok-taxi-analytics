@@ -1,0 +1,77 @@
+python3 -m venv venv
+source venv/bin/activate
+
+
+
+✅ STEP 1 — Stop all Prefect processes
+
+Run this:
+
+prefect server stop
+
+
+If it says “no running server”, that’s fine.
+
+✅ STEP 2 — Reset Prefect local storage (safe)
+prefect config reset
+
+
+Then clear local orchestration state:
+
+prefect work-pool ls
+prefect work-queue ls
+
+
+If anything exists, delete them:
+
+prefect work-pool delete <name>
+prefect work-queue delete <name>
+
+
+(If none exist, skip.)
+
+✅ STEP 3 — OPTIONAL but recommended: wipe Prefect local files
+
+These are under:
+
+~/.prefect
+
+
+You can delete the directory:
+
+Mac:
+rm -rf ~/.prefect
+
+
+This fully resets Prefect (safe, does not affect your project).
+
+✅ STEP 4 — Restart your virtual environment
+
+From your project folder:
+
+deactivate
+
+
+Then:
+
+source venv/bin/activate
+
+✅ STEP 5 — Double-check the fixed flow name
+
+Your flow declaration must NOT have “&” anymore:
+
+@flow(name="Taxi_Analytics_ML_Pipeline")
+def full_pipeline():
+    ...
+
+
+Save the file.
+
+✅ STEP 6 — Run the pipeline again
+
+Run:
+
+python orchestrator/prefect_flows.py
+
+
+This should now run clean.
