@@ -1,98 +1,90 @@
-# 🚖 Bangkok Taxi Route Optimization Platform
+# Bangkok Taxi Route Optimization Platform 🚖
 
-An end-to-end **MLOps-driven decision support system** for optimizing taxi routes in Bangkok.  
-This platform processes large-scale GPS probe data, trains predictive ML models, and serves real-time recommendations that help taxi drivers **maximize revenue** by reducing empty driving time.
+![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker&logoColor=white)
+![MLflow](https://img.shields.io/badge/MLflow-Model%20Registry-0194E2?logo=mlflow&logoColor=white)
+![Prefect](https://img.shields.io/badge/Prefect-Orchestration-white?logo=prefect)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Data-336791?logo=postgresql&logoColor=white)
 
----
+An End-to-End MLOps Platform designed to optimize taxi routes in Bangkok. This system leverages historical GPS probe data, XGBoost predictive modeling, and Monte Carlo simulations to recommend optimal driving routes that maximize revenue based on predicted passenger demand and traffic conditions.
 
-## 📖 Overview
+## 📖 Project Overview
 
-Taxi drivers commonly face the **"Empty Leg"** problem — driving without passengers.  
-This project solves that by predicting:
+Taxi drivers often face the **"Empty Leg" problem**—driving without passengers. This platform solves that by providing a decision-support system that predicts:
 
-- **Next Destination** — Likely passenger destinations based on current location
-- **Trip Duration** — Travel time adjusted for real Bangkok traffic
-- **Trip Distance** — More accurate road distance instead of raw Haversine
-- **Estimated Revenue** — Based on trip distance, duration, and fare models
+1.  **Next Destination:** Where a passenger is likely to want to go from the current location.
+2.  **Trip Duration:** Accurate travel times accounting for Bangkok's traffic.
+3.  **Revenue:** Estimated fare calculation based on distance and time.
 
-A fully Dockerized web application exposes these predictions using an **interactive Leaflet map** and a **Monte Carlo-based route optimizer** that simulates multiple potential routes to identify the highest expected revenue.
+The system serves these predictions via a Dockerized Web Application featuring an interactive map, allowing drivers to simulate shifts and identify high-value routes.
 
 ---
 
 ## 🏗 System Architecture
 
-This project follows a **modern microservices architecture**, fully containerized for reproducibility and deployment.
+The project follows a modern microservices architecture, fully containerized for reproducibility:
 
-### **1. Data Layer — PostgreSQL**
-- Stores millions of historical GPS probe points  
-- Feature tables indexed using **Uber H3 (Resolution 8)**
+| Component | Technology | Description |
+| :--- | :--- | :--- |
+| **Data Layer** | **PostgreSQL** | Stores millions of raw GPS probe points and engineered feature tables. |
+| **Orchestration** | **Prefect** | Automated pipeline that extracts raw data, cleans it, and executes feature engineering tasks. |
+| **Spatial Indexing** | **Uber H3** | Uses Resolution 8 hexagonal indexing to discretize GPS coordinates into spatial zones. |
+| **Model Registry** | **MLflow** | Tracks experiments, logs metrics (MAE, Accuracy), and stores artifacts (encoders, models) for deployment. |
+| **Serving** | **Flask API** | Loads production models from MLflow and serves endpoints. |
+| **Frontend** | **Leaflet.js** | Interactive map with **OSRM** (Open Source Routing Machine) routing. |
 
-### **2. ETL & Orchestration — Prefect**
-- Automated data cleaning  
-- Spatial feature engineering  
-- Monthly scheduled retraining triggers
-
-### **3. Machine Learning Models — XGBoost**
-- **Next Destination:** Multi-class classifier (Top 100 H3 zones)  
-- **Trip Duration:** Regression model predicting travel time  
-- **Trip Distance:** Regression model correcting Haversine distances
-
-### **4. Model Registry — MLflow**
-- Tracks experiments & metrics  
-- Stores:  
-  - Production-ready models  
-  - Encoders  
-  - Spatial metadata
-
-### **5. Serving Layer — Flask API**
-- Loads production models from MLflow  
-- Exposes prediction and simulation endpoints  
-- Performs Monte Carlo route search
-
-### **6. Frontend — Leaflet.js + OSRM**
-- Interactive map UI  
-- Real-world road routing (not straight lines)  
-- Visualizes optimal "Golden Routes" for drivers
+### 🤖 The Models (XGBoost)
+* **Next Destination:** Multi-class classification model (Top-100 high-density zones).
+* **Trip Duration:** Regression model predicting travel time in minutes.
+* **Trip Distance:** Regression model correcting Haversine distance to actual road distance.
 
 ---
 
 ## 🌟 Key Features
 
-### **🔁 Automated Retraining Workflow**
-- GitHub Actions checks for new monthly data  
-- Retrains models automatically  
-- Promotes new models only if they outperform the current champion
+* **🎲 Monte Carlo Route Simulation**
+    Runs hundreds of probabilistic simulations per request to find the "Golden Route" with the highest expected revenue.
 
-### **🎲 Monte Carlo Route Simulation**
-- Hundreds of probabilistic route simulations per request  
-- Computes revenue distributions  
-- Recommends the route with the **highest expected value**
+* **🔄 Automated Retraining Pipeline**
+    A CI/CD workflow (via GitHub Actions) checks for new monthly data, retrains models, and promotes them to production only if they beat the current champion.
 
-### **📦 Production-Grade MLOps**
-- Fully containerized infrastructure  
-- Artifact versioning via MLflow  
-- Reproducible ETL pipelines  
-- Seamless dev → staging → production workflow
+* **🛠 Production-Grade MLOps**
+    Implements best practices like artifact versioning, experiment tracking, and containerization.
 
-### **🗺 Real-World Routing**
-- Integrates **OSRM** for driving paths  
-- Visual route overlays on Leaflet map  
-- Accurate travel time estimates
+* **🗺 Real-World Routing**
+    Integrates OSRM to visualize actual driving paths on the map rather than simple straight lines.
 
 ---
 
 ## 🚀 Getting Started
 
-### **Prerequisites**
-- Docker & Docker Compose  
-- Python 3.11+  
-- Poetry (optional, for local development)
+### Prerequisites
+* Docker & Docker Compose
+* Python 3.11+
+* Poetry (for local dependency management)
+
+### Installation & Run
+
+1.  **Clone the Repository**
+    ```bash
+    git clone [https://github.com/skywalker-89/bangkok-taxi-analytics.git](https://github.com/skywalker-89/bangkok-taxi-analytics.git)
+    cd bangkok-taxi-analytics
+    ```
+
+2.  **Start Infrastructure**
+    Spin up the Database, MLflow Server, API, and Web App using Docker Compose.
+    ```bash
+    docker-compose up -d --build
+    ```
+
+3.  **Run the Data Pipeline**
+    Execute the ETL and Training workflows to populate the database and train the initial models.
+    ```bash
+    # Install dependencies
+    pip install poetry && poetry install
+
+    # Run the Prefect flow
+    poetry run python -m flows.main_flow
+    ```
 
 ---
-
-## 🛠 Installation
-
-### **1. Clone the Repository**
-```bash
-git clone https://github.com/skywalker-89/bangkok-taxi-analytics.git
-cd bangkok-taxi-analytics
