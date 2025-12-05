@@ -4,7 +4,6 @@ import h3
 import sys
 import gc
 import joblib
-import os
 from datetime import timedelta
 from sklearn.preprocessing import LabelEncoder
 from src.utils.db import get_engine, get_db_connection

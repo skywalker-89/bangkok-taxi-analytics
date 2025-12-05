@@ -95,11 +95,10 @@ def train():
 
         # Log Encoders
         print("💾 Logging encoders...")
-        for path in [START_ENCODER_PATH, END_ENCODER_PATH]:
-            if os.path.exists(path):
-                mlflow.log_artifact(path, artifact_path="encoders")
-            elif os.path.exists(os.path.basename(path)):
-                mlflow.log_artifact(os.path.basename(path), artifact_path="encoders")
+        if os.path.exists(START_ENCODER_PATH):
+            mlflow.log_artifact(START_ENCODER_PATH, artifact_path="encoders")
+        if os.path.exists(END_ENCODER_PATH):
+            mlflow.log_artifact(END_ENCODER_PATH, artifact_path="encoders")
 
         # Log Model
         signature = infer_signature(X_test, y_pred)

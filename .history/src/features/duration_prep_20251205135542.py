@@ -16,8 +16,8 @@ ARTIFACT_DIR = "artifacts"
 os.makedirs(ARTIFACT_DIR, exist_ok=True)
 
 # Artifacts (Encoders needed for Training/Inference)
-START_ENCODER_PATH = os.path.join(ARTIFACT_DIR, "duration_start_zone_encoder.pkl")
-END_ENCODER_PATH = os.path.join(ARTIFACT_DIR, "duration_end_zone_encoder.pkl")
+START_ENCODER_PATH = "duration_start_zone_encoder.pkl"
+END_ENCODER_PATH = "duration_end_zone_encoder.pkl"
 
 
 def haversine(lat1, lon1, lat2, lon2):

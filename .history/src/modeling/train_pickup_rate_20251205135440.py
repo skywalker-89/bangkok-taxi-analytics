@@ -81,13 +81,6 @@ def train():
         else:
             print(f"⚠️ Warning: {ENCODER_PATH} not found.")
 
-        if os.path.exists(ENCODER_PATH):
-            mlflow.log_artifact(ENCODER_PATH, artifact_path="encoders")
-        elif os.path.exists("pickup_rate_location_encoder.pkl"):
-            mlflow.log_artifact(
-                "pickup_rate_location_encoder.pkl", artifact_path="encoders"
-            )
-
         # Log Model
         signature = infer_signature(X_test, y_pred)
         mlflow.xgboost.log_model(
