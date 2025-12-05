@@ -1,0 +1,79 @@
+name: Daily Model Retraining Check
+
+on:
+  schedule:
+    # Runs at 18:00 UTC everyday (which is 1:00 AM Bangkok Time next day)
+    - cron: "0 18 * * *"
+  # Allows you to run this workflow manually from the Actions tab for testing
+  workflow_dispatch:
+
+jobs:
+  mlops-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout your code
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # 2. Setup Python environment
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache: "pip" # Caches pip dependencies to speed up future runs
+
+      # 3. Install System Dependencies (Required for psycopg2 & H3)
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpq-dev gcc
+
+      # 4. Install Python Dependencies
+      # We install poetry first, then export to requirements.txt for stability in CI
+      - name: Install Dependencies
+        run: |
+          pip install poetry
+          poetry export -f requirements.txt --output requirements.txt --without-hashes
+          pip install -r requirements.txt
+          # Manually ensure setuptools/wheel are present if needed
+          pip install setuptools wheel beautifulsoup4
+
+      # 5. Run the "Brain" Script
+      # This script checks for data, and if found, runs the whole pipeline
+      - name: Run MLOps Pipeline
+        env:
+          # Secrets are managed in GitHub Repo Settings -> Secrets and variables -> Actions
+          MLFLOW_TRACKING_URI: ${{ secrets.DAGSHUB_MLFLOW_URI }}
+          MLFLOW_TRACKING_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
+          # If using Neon/Supabase/etc for DB:
+          DB_URL: ${{ secrets.NEON_DB_URL }}
+          # Or if you used individual vars in your .env logic:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+        run: |
+          # We run the script directly with python
+          # Ensure the script can find your 'src' and 'flows' packages (PYTHONPATH)
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
+          python scripts/check_and_train.py
+
+      # 6. (Optional) Commit updated state file
+      # If new data was processed, we want to update 'data/latest_data_version.txt' in the repo
+      # so the next run knows not to re-process it.
+      - name: Commit State Changes
+        if: success()
+        run: |
+          git config --global user.name 'GitHub Action'
+          git config --global user.email 'action@github.com'
+          # Check if the state file changed
+          if [[ -n $(git status --porcelain data/latest_data_version.txt) ]]; then
+            git add data/latest_data_version.txt
+            git commit -m "chore: updated latest processed data version"
+            git push
+          else
+            echo "No new data processed, skipping commit."
+          fi
